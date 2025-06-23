@@ -5,27 +5,34 @@
 		<link rel="icon" href="/favicon.png" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		
-		<link rel="modulepreload" href="/_app/immutable/entry/start.C8wb_AlA.js">
-		<link rel="modulepreload" href="/_app/immutable/chunks/D3Pfgfk-.js">
-		<link rel="modulepreload" href="/_app/immutable/chunks/D7j9e_82.js">
-		<link rel="modulepreload" href="/_app/immutable/chunks/YMGA2eaR.js">
-		<link rel="modulepreload" href="/_app/immutable/entry/app.BG0G5X_a.js">
-		<link rel="modulepreload" href="/_app/immutable/chunks/B1vs2c0z.js">
-		<link rel="modulepreload" href="/_app/immutable/chunks/BQikoI5_.js">
+		<link rel="modulepreload" href="/_app/immutable/entry/start.Cn4qeljX.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/BTKaonB7.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/NwSd7mST.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/4kmj9zwE.js">
+		<link rel="modulepreload" href="/_app/immutable/entry/app.DDRZe2jG.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/DXAOCrGv.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/CFZaivjI.js">
 	</head>
 	<body data-sveltekit-preload-data="hover">
+		<script>
+			(function () {
+				const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+				document.documentElement.classList.toggle('dark', prefersDark);
+				document.documentElement.classList.toggle('light', !prefersDark);
+			})();
+		</script>
 		<div style="display: contents">
 			<script>
 				{
-					__sveltekit_fd3785 = {
+					__sveltekit_1qhzeqi = {
 						base: ""
 					};
 
 					const element = document.currentScript.parentElement;
 
 					Promise.all([
-						import("/_app/immutable/entry/start.C8wb_AlA.js"),
-						import("/_app/immutable/entry/app.BG0G5X_a.js")
+						import("/_app/immutable/entry/start.Cn4qeljX.js"),
+						import("/_app/immutable/entry/app.DDRZe2jG.js")
 					]).then(([kit, app]) => {
 						kit.start(app, element);
 					});
