@@ -6,26 +6,32 @@
 		return new Promise<IDBDatabase>((resolve, reject) => {
 			const dbName = 'ridingtracker';
 			const storeName = 'rides';
-			let request = indexedDB.open(dbName, 1);
-			let needsUpgrade = false;
+			const timerStoreName = 'timer';
+			let request = indexedDB.open(dbName, 2);
 
 			request.onupgradeneeded = () => {
 				const db = request.result;
 				if (!db.objectStoreNames.contains(storeName)) {
 					db.createObjectStore(storeName, { keyPath: 'id' });
 				}
+				if (!db.objectStoreNames.contains(timerStoreName)) {
+					db.createObjectStore(timerStoreName, { keyPath: 'key' });
+				}
 			};
 
 			request.onsuccess = () => {
 				const db = request.result;
-				if (!db.objectStoreNames.contains(storeName)) {
-					// If the store is still missing, delete and recreate the DB
+				if (
+					!db.objectStoreNames.contains(storeName) ||
+					!db.objectStoreNames.contains(timerStoreName)
+				) {
 					db.close();
 					indexedDB.deleteDatabase(dbName).onsuccess = () => {
-						const secondRequest = indexedDB.open(dbName, 1);
+						const secondRequest = indexedDB.open(dbName, 2);
 						secondRequest.onupgradeneeded = () => {
 							const db2 = secondRequest.result;
 							db2.createObjectStore(storeName, { keyPath: 'id' });
+							db2.createObjectStore(timerStoreName, { keyPath: 'key' });
 						};
 						secondRequest.onsuccess = () => resolve(secondRequest.result);
 						secondRequest.onerror = () => reject(secondRequest.error);
@@ -75,14 +81,86 @@
 		});
 	}
 
+	async function setStartTime(startTime: number) {
+		const db = await openDB();
+		return new Promise<void>((resolve) => {
+			const tx = db.transaction('timer', 'readwrite');
+			const store = tx.objectStore('timer');
+			store.put({ key: 'startTime', value: startTime });
+			tx.oncomplete = () => resolve();
+		});
+	}
+
+	async function getStartTime(): Promise<number | null> {
+		const db = await openDB();
+		return new Promise((resolve) => {
+			const tx = db.transaction('timer', 'readonly');
+			const store = tx.objectStore('timer');
+			const req = store.get('startTime');
+			req.onsuccess = () => {
+				if (req.result) resolve(req.result.value);
+				else resolve(null);
+			};
+			req.onerror = () => resolve(null);
+		});
+	}
+
+	async function clearStartTime() {
+		const db = await openDB();
+		return new Promise<void>((resolve) => {
+			const tx = db.transaction('timer', 'readwrite');
+			const store = tx.objectStore('timer');
+			store.delete('startTime');
+			tx.oncomplete = () => resolve();
+		});
+	}
+
 	let timeElapsed = $state('00:00:00');
-	let secondsElapsed = $state(0);
-	let minutesElapsed = $state(0);
-	let hoursElapsed = $state(0);
 	let interval: NodeJS.Timeout | undefined;
 	let rides = $state<{ time: string; date: Date; horse: string; id: number }[]>([]);
 	let selectedHorse = $state('Charmer');
 	let rideIdCounter = $state(0);
+	let startTime = $state<number | null>(null);
+	let isRunning = $state(false);
+
+	function computeTimeElapsed() {
+		if (startTime !== null) {
+			const now = Date.now();
+			const elapsed = now - startTime;
+			const totalSeconds = Math.floor(elapsed / 1000);
+			const hours = Math.floor(totalSeconds / 3600);
+			const minutes = Math.floor((totalSeconds % 3600) / 60);
+			const seconds = totalSeconds % 60;
+			if (isRunning) {
+				const hundredths = Math.floor((elapsed % 1000) / 10)
+					.toString()
+					.padStart(2, '0');
+				timeElapsed = `${hours.toString().padStart(2, '0')}:${minutes
+					.toString()
+					.padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${hundredths}`;
+			} else {
+				timeElapsed = `${hours.toString().padStart(2, '0')}:${minutes
+					.toString()
+					.padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+			}
+		} else {
+			timeElapsed = '00:00:00';
+		}
+	}
+
+	function startTimer() {
+		if (interval) return;
+		if (startTime === null) {
+			const now = Date.now();
+			startTime = now;
+			setStartTime(now);
+		}
+		isRunning = true;
+		computeTimeElapsed();
+		interval = setInterval(() => {
+			computeTimeElapsed();
+		}, 10);
+	}
 
 	onMount(async () => {
 		rides = await getRides();
@@ -90,6 +168,11 @@
 			rideIdCounter = Math.max(...rides.map((r) => r.id)) + 1;
 		} else {
 			rideIdCounter = 0;
+		}
+		startTime = await getStartTime();
+		computeTimeElapsed();
+		if (startTime !== null) {
+			startTimer();
 		}
 	});
 
@@ -106,48 +189,28 @@
 		return `${dayOfWeek}, ${month}/${day}/${year}`;
 	}
 
-	function startTimer() {
-		if (interval) return; // Prevent multiple intervals
-		interval = setInterval(() => {
-			secondsElapsed++;
-			if (secondsElapsed === 60) {
-				minutesElapsed++;
-				secondsElapsed = 0;
-			}
-			if (minutesElapsed === 60) {
-				hoursElapsed++;
-				minutesElapsed = 0;
-			}
-			timeElapsed = `${hoursElapsed.toString().padStart(2, '0')}:${minutesElapsed.toString().padStart(2, '0')}:${secondsElapsed.toString().padStart(2, '0')}`;
-		}, 1000);
-	}
-
 	function stopTimerSave() {
-		clearInterval(interval);
-		interval = undefined;
-		rides = [
-			...rides,
-			{
-				time: timeElapsed,
-				date: new Date(),
-				horse: selectedHorse,
-				id: rideIdCounter
-			}
-		];
-		rideIdCounter++;
-		timeElapsed = '00:00:00';
-		secondsElapsed = 0;
-		minutesElapsed = 0;
-		hoursElapsed = 0;
-	}
-
-	function resetTimer() {
-		clearInterval(interval);
-		interval = undefined;
-		secondsElapsed = 0;
-		minutesElapsed = 0;
-		hoursElapsed = 0;
-		timeElapsed = '00:00:00';
+		if (interval) {
+			clearInterval(interval);
+			interval = undefined;
+		}
+		isRunning = false;
+		if (startTime !== null) {
+			computeTimeElapsed();
+			rides = [
+				...rides,
+				{
+					time: timeElapsed.split('.')[0],
+					date: new Date(),
+					horse: selectedHorse,
+					id: rideIdCounter
+				}
+			];
+			rideIdCounter++;
+			startTime = null;
+			clearStartTime();
+			timeElapsed = '00:00:00';
+		}
 	}
 
 	function deleteRide(id: number) {
@@ -180,9 +243,7 @@
 	</button>
 </div>
 <button
-	class="m-2 w-[calc(100vw-1rem)] rounded-md bg-green-500 p-2 text-xl text-white
-               transition-all duration-100 ease-in-out
-               active:scale-98 active:shadow-sm active:brightness-90"
+	class="m-2 w-[calc(100vw-1rem)] rounded-md bg-green-500 p-2 text-xl text-white transition-all duration-100 ease-in-out active:scale-98 active:shadow-sm active:brightness-90"
 	onclick={startTimer}
 >
 	Start
@@ -201,7 +262,16 @@
 	class="m-2 w-[calc(100vw-1rem)] rounded-md bg-yellow-500 p-2 text-xl text-white
                transition-all duration-100 ease-in-out
                active:scale-98 active:shadow-sm active:brightness-90"
-	onclick={resetTimer}
+	onclick={() => {
+		if (interval) {
+			clearInterval(interval);
+			interval = undefined;
+		}
+		isRunning = false;
+		startTime = null;
+		clearStartTime();
+		timeElapsed = '00:00:00';
+	}}
 >
 	Reset
 </button>
