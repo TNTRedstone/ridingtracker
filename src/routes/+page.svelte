@@ -304,7 +304,7 @@
 				<td class="px-2 py-1 text-center align-middle text-base">
 					<span
 						class={`rounded-md px-1 py-1 font-semibold
-						${ride.horse === 'Charmer' ? 'bg-orange-400 text-white dark:bg-orange-500 dark:text-zinc-900' : 'bg-yellow-900 text-white dark:bg-yellow-800 dark:text-yellow-200'}`}
+						${ride.horse === 'Charmer' ? 'bg-orange-400 text-white dark:text-zinc-900' : 'bg-yellow-900 text-white dark:text-yellow-200'}`}
 						>{ride.horse}</span
 					>
 				</td>
